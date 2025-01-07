@@ -25,36 +25,20 @@ from sklearn.metrics import f1_score
 from sklearn.metrics.pairwise import cosine_similarity
 from nltk import word_tokenize
 from sklearn.metrics import accuracy_score
-# from torchmetrics.text.bert import BERTScore
-# from torchmetrics.functional.text.bert import bert_score
 import os
 import random
 
 from rouge_score.rouge_scorer import RougeScorer
 from sklearn.metrics import jaccard_score
 from sklearn.metrics import f1_score
-#from torchmetrics.text.bert import BERTScore
 from torchmetrics.functional.text.bert import bert_score
 import random
 from sentence_transformers import SentenceTransformer
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 Sem_model = SentenceTransformer('bert-base-nli-mean-tokens')
-
-
-# def set_seed(seed):
-#     np.random.seed(seed)
-#     torch.manual_seed(seed)
-#     if torch.cuda.is_available():  # GPU operation have separate seed
-#         torch.cuda.manual_seed(seed)
-#         torch.cuda.manual_seed_all(seed)
-
-
-# set_seed(42)
-# set_random_seed(42)
 
 def set_random_seed(seed: int):
     """
@@ -78,10 +62,6 @@ def set_random_seed(seed: int):
 
 
 set_random_seed(42)
-
-
-
-
 
 import warnings
 
@@ -310,10 +290,6 @@ class MultimodalBartForConditionalGeneration(BartPretrainedModel):
         self.register_buffer("final_logits_bias", torch.zeros((1, self.model.shared.num_embeddings)))
         self.lm_head = nn.Linear(config.d_model, self.model.shared.num_embeddings, bias=False)
 
-        # self.classifier = nn.Sequential(nn.Linear(Encoder_Cls_dim, 300),
-        #                                 nn.ReLU(),
-        #                                 nn.Linear(300, Num_labels),
-        #                                 nn.Softmax(-1))
         self.init_weights()
 
     def get_encoder(self):
@@ -414,15 +390,7 @@ class MultimodalBartForConditionalGeneration(BartPretrainedModel):
         classification_loss = 0
         if intent_labels is not None:
              print(outputs.keys())
-
-             # print(outputs.encoder_last_hidden_state.shape)
-             # cls_logits = self.classifier(outputs.encoder_last_hidden_state.mean(dim = 1)) # New addition
-             # cls_logits = self.classifier(outputs.encoder_last_hidden_state[:, 0, :]) # New addition
-             # print(cls_logits.shape,intent_labels.shape)
-             # classification_loss = loss_cls(cls_logits.view(-1,Num_labels),intent_labels.view(-1))
-             # Total_loss = 0.1*classification_loss + 0.9*masked_lm_loss ## (Changess)
              Total_loss = masked_lm_loss
-        #cls_logits = self.classifier(outputs.encoder_last_hidden_state.mean(dim = 1)) # New addition
 
 
 
@@ -615,56 +583,6 @@ class MultimodalBartModel(BartPretrainedModel):
             encoder_attentions=encoder_outputs.attentions,
         )
 
-# ---------------------------------------------- Modality Aware Fusion ----------------------------------------------
-
-# class MAF(nn.Module):
-    
-#     def __init__(self,
-#                  dim_model: int,
-#                  dropout_rate: int):
-#         super(MAF, self).__init__()
-#         self.dropout_rate = dropout_rate
-        
-#         self.visual_context_transform = nn.Linear(VISUAL_MAX_LEN, SOURCE_MAX_LEN, bias=False)
-
-
-#         self.visual_context_attention = ContextAwareAttention(dim_model=dim_model,
-#                                                               dim_context=VISUAL_DIM,
-#                                                               dropout_rate=dropout_rate)   
-
-#         self.visual_gate = nn.Linear(2*dim_model, dim_model)
-#         self.dropout_layer = nn.Dropout(dropout_rate)
-#         self.final_layer_norm = nn.LayerNorm(dim_model)
-
-        
-        
-        
-        
-#     def forward(self,
-#                 text_input: torch.Tensor,
-#                 visual_context: Optional[torch.Tensor]=None):
-                    
- 
-#         # Video as Context for Attention
-#         visual_context = visual_context.permute(0, 2, 1)
-#         visual_context = self.visual_context_transform(visual_context)
-#         visual_context = visual_context.permute(0, 2, 1)
-        
-#         video_out = self.visual_context_attention(q=text_input,
-#                                                   k=text_input,
-#                                                   v=text_input,
-#                                                   context=visual_context)
-
-        
-#         # Global Information Fusion Mechanism
-#         weight_v = F.sigmoid(self.visual_gate(torch.cat((video_out, text_input), dim=-1)))
-
-#         output = self.final_layer_norm(text_input +
-#                                        weight_v * video_out)
-
-#         return output
-
-
 class MAF(nn.Module):
     
     def __init__(self,
@@ -712,7 +630,7 @@ class MAF(nn.Module):
                                                   context=visual_context)
 
 
-         # kg as Context for Attention
+        # kg as Context for Attention
         # kg_context = kg_context.permute(0, 2, 1)
         # kg_context = self.kg_context_transform(kg_context)
         # kg_context = kg_context.permute(0, 2, 1)
@@ -814,13 +732,6 @@ class MAF_P(nn.Module):
                                                                 dim_context=PPCC_DIM,
                                                                 dropout_rate=dropout_rate)
         
-        # self.visual_context_transform = nn.Linear(VISUAL_MAX_LEN, SOURCE_MAX_LEN, bias=False)
-
-
-        # self.visual_context_attention = ContextAwareAttention(dim_model=dim_model,
-        #                                                       dim_context=VISUAL_DIM,
-        #                                                       dropout_rate=dropout_rate) 
-
         self.ppc_gate = nn.Linear(2*dim_model, dim_model)
         # self.visual_gate = nn.Linear(2*dim_model, dim_model)
         self.dropout_layer = nn.Dropout(dropout_rate)
@@ -1130,10 +1041,6 @@ def _save(model,
         if tokenizer is not None:
             tokenizer.save_pretrained(output_dir)
 
-        # Good practice: save your training arguments together with the trained model
-#         torch.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-
-
 def save_model(model, 
                output_dir: str,
                tokenizer=None, 
@@ -1160,14 +1067,6 @@ def val_epoch(model,
             visual_input = visual_input.unsqueeze(dim = 1)
             audio_input = audio_input.unsqueeze(dim = 1)
             ppc_input = ppc_input.squeeze(dim = 1)
-
-            # outputs, logits = model(input_ids=input_ids,
-            #                 attention_mask=attention_mask,
-            #                 visual_input=visual_input,
-            #                 intent_labels = intent_labels,
-            #                 labels=labels,
-            #                 test = False
-            #                 )
             outputs = model(input_ids=input_ids,
                             attention_mask=attention_mask,
                             visual_input=visual_input,
@@ -1178,23 +1077,8 @@ def val_epoch(model,
                             test = False
                             )
             loss = outputs['loss']
-            # pred = list(torch.argmax(logits,dim  = -1).cpu().detach().numpy())
-            # act = list(intent_labels.cpu().detach().numpy())
-
-            # predictions.extend(pred)
-            # actuals.extend(act)
-            # print(logits.shape)
             epoch_val_loss += loss.item()
 
-
-    # ACC = accuracy_score(actuals, predictions)
-    # print('VAL accuracy:', ACC)
-    # accuracy = f1_score(actuals,predictions, average = "macro")
-   
-
-
-    # del pred
-    # del act
     del batch
     del input_ids
     del attention_mask
@@ -1349,13 +1233,6 @@ def test_epoch(model,
                                            ppc_input=ppc_input,
                                            **gen_kwargs)
             
-            # outputs, logits = model(input_ids=input_ids,
-            #                 attention_mask=attention_mask,
-            #                 visual_input=visual_input,
-            #                 intent_labels = intent_labels,
-            #                 labels=labels,
-            #                 test = False
-            #                 )
             outputs = model(input_ids=input_ids,
                             attention_mask=attention_mask,
                             visual_input=visual_input,
@@ -1373,15 +1250,6 @@ def test_epoch(model,
             intent_prediction_list.extend(intent_prediction)
             intent_real_list.extend(intent_labels.tolist())
 
-
-            
-            # print(logits.shape)               
-            # pred = list(torch.argmax(logits,dim  = -1).cpu().detach().numpy())
-            # act = list(intent_labels.cpu().detach().numpy())
-
-
-            # cls_pred.extend(pred)
-            # actuals.extend(act)
             generated_ids = generated_ids.detach().cpu().numpy()
             generated_ids = np.where(generated_ids != -100, generated_ids, tokenizer.pad_token_id)
             decoded_preds = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
@@ -1393,18 +1261,13 @@ def test_epoch(model,
             predictions.extend(decoded_preds)
             gold.extend(decoded_labels)
 
-    # ACC = accuracy_score(actuals, predictions)
     acc =  accuracy_score(intent_real_list, intent_prediction_list)
     f1 =   f1_score(intent_real_list, intent_prediction_list, average = 'macro')
     CR = [acc, f1]
 
     print("Intent accuracy : ", accuracy_score(intent_real_list, intent_prediction_list))
     print("F1 score : ", f1_score(intent_real_list, intent_prediction_list, average = 'macro'))
-    # print('Test accuracy:', ACC)
-    # f1 = f1_score(actuals,cls_pred, average = "macro")
-    # print(actuals, cls_pred)
-    # print('Test F1 Score:', f1)
-    
+
     
     del batch
     del input_ids
@@ -1426,114 +1289,52 @@ def jaccard(list1, list2):
     union = (len(list1) + len(list2)) - intersection
     return float(intersection) / union
 
-def get_scores(reference_list: list,
-               hypothesis_list: list):
-    count=0
-    met=0
-    bleu_1=0
-    bleu_2=0
-    bleu_3=0
-    bleu_4=0
-    rouge1=0
-    rouge2=0
-    bs = 0
-    J=0
-    rougel = 0
-    weights_1 = (1./1.,)
-    weights_2 = (1./2. , 1./2.)
-    weights_3 = (1./3., 1./3., 1./3.)
-    weights_4 = (1./4., 1./4., 1./4., 1./4.)
+def get_scores(reference_list: List[str], hypothesis_list: List[str]):
+    # Initialize accumulators
+    metrics = {
+        "rouge_1": 0,
+        "rouge_2": 0,
+        "rouge_L": 0,
+        "meteor": 0,
+        "BS": 0,
+        "JS": 0,
+        "bleu_1": 0,
+        "bleu_2": 0,
+        "bleu_3": 0,
+        "bleu_4": 0,
+    }
+    
+    bleu_weights = [
+        (1.,),
+        (0.5, 0.5),  
+        (1/3, 1/3, 1/3), 
+        (0.25, 0.25, 0.25, 0.25)  
+    ]
+    
     rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
+    count = len(reference_list)
 
-    for reference, hypothesis in list(zip(reference_list, hypothesis_list)):
-        scores = rouge_scorer.score(reference, hypothesis)
-        rouge1 += scores['rouge1'].fmeasure
-        rouge2 += scores['rouge2'].fmeasure
-        rougel += scores['rougeL'].fmeasure
+    for reference, hypothesis in zip(reference_list, hypothesis_list):
+        rouge_scores = rouge_scorer.score(reference, hypothesis)
+        metrics["rouge_1"] += rouge_scores['rouge1'].fmeasure
+        metrics["rouge_2"] += rouge_scores['rouge2'].fmeasure
+        metrics["rouge_L"] += rouge_scores['rougeL'].fmeasure
 
-        met += meteor_score([word_tokenize(reference)], word_tokenize(hypothesis))
+        metrics["meteor"] += meteor_score([word_tokenize(reference)], word_tokenize(hypothesis))
 
-        Ref_E = Sem_model.encode(reference)
-        Hyp_E = Sem_model.encode(hypothesis)
-
-        bs += cosine_similarity([Ref_E],[Hyp_E])
-
-        # print('ref:',reference)
-        # print('hyp:',hypothesis)
-        # print('co sine:',bs)
+        Ref_E, Hyp_E = Sem_model.encode(reference), Sem_model.encode(hypothesis)
+        metrics["BS"] += cosine_similarity([Ref_E], [Hyp_E])[0][0]
 
 
-        reference = reference.split()
-        hypothesis = hypothesis.split()
-        
-        # results = bertscore.compute(predictions=hypothesis, references=reference)
+        ref_tokens, hyp_tokens = set(reference.split()), set(hypothesis.split())
+        metrics["JS"] += len(ref_tokens & hyp_tokens) / len(ref_tokens | hyp_tokens)
 
-        J += jaccard(reference, hypothesis)
-        # print('jaccard_score', J)
+        tokenized_ref, tokenized_hyp = reference.split(), hypothesis.split()
+        for i, weights in enumerate(bleu_weights, start=1):
+            metrics[f"bleu_{i}"] += sentence_bleu([tokenized_ref], tokenized_hyp, weights)
 
-
-        bleu_1 += sentence_bleu([reference], hypothesis, weights_1) 
-        bleu_2 += sentence_bleu([reference], hypothesis, weights_2)
-        bleu_3 += sentence_bleu([reference], hypothesis, weights_3)
-        bleu_4 += sentence_bleu([reference], hypothesis, weights_4)
-        count += 1
-
-    return {
-        "rouge_1": rouge1*100/count,
-        "rouge_2": rouge2*100/count,
-        "rouge_L": rougel*100/count,
-        "bleu_1": bleu_1*100/count,
-        "bleu_2": bleu_2*100/count,
-        "bleu_3": bleu_3*100/count,
-        "bleu_4": bleu_4*100/count,
-        "meteor": met*100/count,
-        "BS":bs/count,
-        "JS":J/count    }
-
-# def get_scores(reference_list: list,
-#                hypothesis_list: list):
-#     count=0
-#     met=0
-#     bleu_1=0
-#     bleu_2=0
-#     bleu_3=0
-#     bleu_4=0
-#     rouge1=0
-#     rouge2=0
-#     rougel = 0
-#     weights_1 = (1./1.,)
-#     weights_2 = (1./2. , 1./2.)
-#     weights_3 = (1./3., 1./3., 1./3.)
-#     weights_4 = (1./4., 1./4., 1./4., 1./4.)
-#     rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
-
-#     for reference, hypothesis in list(zip(reference_list, hypothesis_list)):
-#         scores = rouge_scorer.score(reference, hypothesis)
-#         rouge1 += scores['rouge1'].fmeasure
-#         rouge2 += scores['rouge2'].fmeasure
-#         rougel += scores['rougeL'].fmeasure
-
-#         # met += meteor_score([reference], hypothesis)
-#         met += meteor_score([word_tokenize(reference)], word_tokenize(hypothesis))
-
-#         reference = reference.split()
-#         hypothesis = hypothesis.split()
-#         bleu_1 += sentence_bleu([reference], hypothesis, weights_1) 
-#         bleu_2 += sentence_bleu([reference], hypothesis, weights_2)
-#         bleu_3 += sentence_bleu([reference], hypothesis, weights_3)
-#         bleu_4 += sentence_bleu([reference], hypothesis, weights_4)
-#         count += 1
-
-#     return {
-#         "rouge_1": rouge1*100/count,
-#         "rouge_2": rouge2*100/count,
-#         "rouge_L": rougel*100/count,
-#         "bleu_1": bleu_1*100/count,
-#         "bleu_2": bleu_2*100/count,
-#         "bleu_3": bleu_3*100/count,
-#         "bleu_4": bleu_4*100/count,
-#         "meteor": met*100/count,
-#     }
+    # Average the accumulated metrics
+    return {key: (value * 100 / count) if key.startswith("rouge") or key.startswith("bleu") or key == "meteor" else value / count for key, value in metrics.items()}
 
        
 def prepare_for_training(model,
