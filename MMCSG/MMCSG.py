@@ -248,10 +248,6 @@ class ContextAwareAttention(nn.Module):
         self.w1_v = nn.Linear(self.dim_model, 1, bias=False)
         self.w2_v = nn.Linear(self.dim_model, 1, bias=False)
         
-
-
-
-
     def forward(self,
                 q: torch.Tensor, 
                 k: torch.Tensor,
@@ -272,9 +268,6 @@ class ContextAwareAttention(nn.Module):
                                                    value=v_cap)
         return attention_output
          
-
-
-
 
 class MultimodalBartForConditionalGeneration(BartPretrainedModel):
     base_model_prefix = "model"
@@ -381,16 +374,6 @@ class MultimodalBartForConditionalGeneration(BartPretrainedModel):
         if labels is not None:
             loss_fct = CrossEntropyLoss()
             masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
-#         loss_cls = CrossEntropyLoss()
-       
-        # classification_loss = 0
-        # if intent_labels is not None:
-        #     print(outputs.keys())
-        #     # print(outputs.encoder_last_hidden_state.shape)
-        #     cls_logits = self.classifier(outputs.encoder_last_hidden_state.mean(dim = 1)) # New addition
-        #     # print(cls_logits.shape,intent_labels.shape)
-        #     classification_loss = loss_cls(cls_logits.view(-1,Num_labels),intent_labels.view(-1))
-        #     Total_loss = classification_loss #+ masked_lm_loss
         cls_logits = self.classifier(outputs.encoder_last_hidden_state.mean(dim = 1)) # New addition
 
 
@@ -462,7 +445,6 @@ class MultimodalBartForConditionalGeneration(BartPretrainedModel):
     def _reorder_cache(past, beam_idx):
         reordered_past = ()
         for layer_past in past:
-            # cached cross_attention states don't have to be reordered -> they are always the same
             reordered_past += (
                 tuple(past_state.index_select(0, beam_idx) for past_state in layer_past[:2]) + layer_past[2:],
             )
@@ -516,9 +498,6 @@ class MultimodalBartModel(BartPretrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
-
-        # different to other models, Bart automatically creates decoder_input_ids from
-        # input_ids if no decoder_input_ids are provided
         if decoder_input_ids is None and decoder_inputs_embeds is None:
             decoder_input_ids = shift_tokens_right(
                 input_ids, self.config.pad_token_id, self.config.decoder_start_token_id
@@ -905,10 +884,6 @@ def _save(model,
         if tokenizer is not None:
             tokenizer.save_pretrained(output_dir)
 
-        # Good practice: save your training arguments together with the trained model
-#         torch.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-
-
 def save_model(model, 
                output_dir: str,
                tokenizer=None, 
@@ -1063,17 +1038,6 @@ def get_val_scores(model,
                                    **gen_kwargs)
     result = get_scores(predictions, gold)
     
-    # if "Validation" in desc and epoch == MAX_EPOCHS - 1:
-    #     val_df = pd.DataFrame(list(zip(gold, predictions)), columns=['actual_explanation', 'predicted_explanation'])
-    #     file_name = "/home/abhisek_1921cs16/New/MMCSG/val-IPC_mmcs" + str(epoch+1) + "_val_results.csv"
-    #     val_df.to_csv(file_name, index=False) 
-    #     print("Validation File saved")
-        
-    #elif "Test" in desc and epoch == MAX_EPOCHS - 1:
-    # test_df = pd.DataFrame(list(zip(gold, predictions)), columns=['actual_explanation', 'predicted_explanation'])
-    # file_name = "/home/abhisek_1921cs16/New/MMCSG/Multimodal_summary_5/Test_results_T_I_DS/test-T-I-DS_mmcs.csv"
-    # test_df.to_csv(file_name, index=False)  
-    # print("Test File saved")
     if "Test" in desc:
         test_df = pd.DataFrame(list(zip(gold, predictions)), columns=['actual', 'predicted'])
         file_name = "./Gen/" + str(epoch+1) + "_test_MDS_TI_results.csv"
@@ -1158,69 +1122,49 @@ def jaccard(list1, list2):
     union = (len(list1) + len(list2)) - intersection
     return float(intersection) / union
 
-def get_scores(reference_list: list,
-               hypothesis_list: list):
-    count=0
-    met=0
-    bleu_1=0
-    bleu_2=0
-    bleu_3=0
-    bleu_4=0
-    rouge1=0
-    bs = 0
-    J = 0
-    rouge2=0
-    rougel = 0
-    weights_1 = (1./1.,)
-    weights_2 = (1./2. , 1./2.)
-    weights_3 = (1./3., 1./3., 1./3.)
-    weights_4 = (1./4., 1./4., 1./4., 1./4.)
-    rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
-
-    for reference, hypothesis in list(zip(reference_list, hypothesis_list)):
-        scores = rouge_scorer.score(reference, hypothesis)
-        rouge1 += scores['rouge1'].fmeasure
-        rouge2 += scores['rouge2'].fmeasure
-        rougel += scores['rougeL'].fmeasure
-
-        met += meteor_score([word_tokenize(reference)], word_tokenize(hypothesis))
-
-        Ref_E = Sem_model.encode(reference)
-        Hyp_E = Sem_model.encode(hypothesis)
-
-        bs += cosine_similarity([Ref_E],[Hyp_E])
-
-        # print('ref:',reference)
-        # print('hyp:',hypothesis)
-        # print('co sine:',bs)
-
-
-        reference = reference.split()
-        hypothesis = hypothesis.split()
-        
-        # results = bertscore.compute(predictions=hypothesis, references=reference)
-
-        J +=  jaccard(reference, hypothesis)
-
-
-        bleu_1 += sentence_bleu([reference], hypothesis, weights_1) 
-        bleu_2 += sentence_bleu([reference], hypothesis, weights_2)
-        bleu_3 += sentence_bleu([reference], hypothesis, weights_3)
-        bleu_4 += sentence_bleu([reference], hypothesis, weights_4)
-        count += 1
-
-    return {
-        "rouge_1": rouge1*100/count,
-        "rouge_2": rouge2*100/count,
-        "rouge_L": rougel*100/count,
-        "bleu_1": bleu_1*100/count,
-        "bleu_2": bleu_2*100/count,
-        "bleu_3": bleu_3*100/count,
-        "bleu_4": bleu_4*100/count,
-        "meteor": met*100/count,
-        "JS": J/count,
-        "BS": bs/count
+def get_scores(reference_list: List[str], hypothesis_list: List[str]) -> dict:
+    # Initialize accumulators
+    metrics = {
+        "rouge_1": 0,
+        "rouge_2": 0,
+        "rouge_L": 0,
+        "bleu_1": 0,
+        "bleu_2": 0,
+        "bleu_3": 0,
+        "bleu_4": 0,
+        "meteor": 0,
     }
+    
+    # Define BLEU weights
+    bleu_weights = [
+        (1.,),             # BLEU-1
+        (0.5, 0.5),        # BLEU-2
+        (1/3, 1/3, 1/3),   # BLEU-3
+        (0.25, 0.25, 0.25, 0.25)  # BLEU-4
+    ]
+    
+    rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
+    count = len(reference_list)
+
+    for reference, hypothesis in zip(reference_list, hypothesis_list):
+        # Compute ROUGE scores
+        rouge_scores = rouge_scorer.score(reference, hypothesis)
+        metrics["rouge_1"] += rouge_scores['rouge1'].fmeasure
+        metrics["rouge_2"] += rouge_scores['rouge2'].fmeasure
+        metrics["rouge_L"] += rouge_scores['rougeL'].fmeasure
+
+        # Compute METEOR
+        metrics["meteor"] += meteor_score([reference], hypothesis)
+
+        # Tokenize for BLEU
+        tokenized_ref, tokenized_hyp = reference.split(), hypothesis.split()
+
+        # Compute BLEU scores
+        for i, weights in enumerate(bleu_weights, start=1):
+            metrics[f"bleu_{i}"] += sentence_bleu([tokenized_ref], tokenized_hyp, weights)
+
+    # Average the metrics
+    return {key: value * 100 / count for key, value in metrics.items()}
 
        
 def prepare_for_training(model,
@@ -1319,20 +1263,6 @@ MODEL.to(DEVICE)
 
 Sem_model = SentenceTransformer('bert-base-nli-mean-tokens')
 Sem_model.to(DEVICE)
-
-# device_id = torch.cuda.device_count()
-# if torch.cuda.device._count()>1:
-#    MODEL = nn.DataParallel(MODEL)
-
-# MODEL = MODEL.to("cuda:{}".format(DEVICE))
-
-# # MODEL.to("cuda:{}".format(device_id))
-
-
-# # print(torch.cuda.device_count())
-# # DEVICE_1 = torch.device("cuda",[1,2])
-# # print(DEVICE_1)
- # MODEL.to(DEVICE)
 
 TOKENIZER = BartTokenizerFast.from_pretrained('facebook/bart-base')
 print("Tokenizer loaded...\n")
