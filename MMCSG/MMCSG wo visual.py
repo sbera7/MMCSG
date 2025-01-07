@@ -33,28 +33,15 @@ import random
 from rouge_score.rouge_scorer import RougeScorer
 from sklearn.metrics import jaccard_score
 from sklearn.metrics import f1_score
-#from torchmetrics.text.bert import BERTScore
 from torchmetrics.functional.text.bert import bert_score
 import random
 from sentence_transformers import SentenceTransformer
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 Sem_model = SentenceTransformer('bert-base-nli-mean-tokens')
 
-
-# def set_seed(seed):
-#     np.random.seed(seed)
-#     torch.manual_seed(seed)
-#     if torch.cuda.is_available():  # GPU operation have separate seed
-#         torch.cuda.manual_seed(seed)
-#         torch.cuda.manual_seed_all(seed)
-
-
-# set_seed(42)
-# set_random_seed(42)
 
 def set_random_seed(seed: int):
     """
@@ -78,10 +65,6 @@ def set_random_seed(seed: int):
 
 
 set_random_seed(42)
-
-
-
-
 
 import warnings
 
@@ -414,15 +397,7 @@ class MultimodalBartForConditionalGeneration(BartPretrainedModel):
         classification_loss = 0
         if intent_labels is not None:
              print(outputs.keys())
-
-             # print(outputs.encoder_last_hidden_state.shape)
-             # cls_logits = self.classifier(outputs.encoder_last_hidden_state.mean(dim = 1)) # New addition
-             # cls_logits = self.classifier(outputs.encoder_last_hidden_state[:, 0, :]) # New addition
-             # print(cls_logits.shape,intent_labels.shape)
-             # classification_loss = loss_cls(cls_logits.view(-1,Num_labels),intent_labels.view(-1))
-             # Total_loss = 0.1*classification_loss + 0.9*masked_lm_loss ## (Changess)
              Total_loss = masked_lm_loss
-        #cls_logits = self.classifier(outputs.encoder_last_hidden_state.mean(dim = 1)) # New addition
 
 
 
@@ -616,55 +591,6 @@ class MultimodalBartModel(BartPretrainedModel):
         )
 
 # ---------------------------------------------- Modality Aware Fusion ----------------------------------------------
-
-# class MAF(nn.Module):
-    
-#     def __init__(self,
-#                  dim_model: int,
-#                  dropout_rate: int):
-#         super(MAF, self).__init__()
-#         self.dropout_rate = dropout_rate
-        
-#         self.visual_context_transform = nn.Linear(VISUAL_MAX_LEN, SOURCE_MAX_LEN, bias=False)
-
-
-#         self.visual_context_attention = ContextAwareAttention(dim_model=dim_model,
-#                                                               dim_context=VISUAL_DIM,
-#                                                               dropout_rate=dropout_rate)   
-
-#         self.visual_gate = nn.Linear(2*dim_model, dim_model)
-#         self.dropout_layer = nn.Dropout(dropout_rate)
-#         self.final_layer_norm = nn.LayerNorm(dim_model)
-
-        
-        
-        
-        
-#     def forward(self,
-#                 text_input: torch.Tensor,
-#                 visual_context: Optional[torch.Tensor]=None):
-                    
- 
-#         # Video as Context for Attention
-#         visual_context = visual_context.permute(0, 2, 1)
-#         visual_context = self.visual_context_transform(visual_context)
-#         visual_context = visual_context.permute(0, 2, 1)
-        
-#         video_out = self.visual_context_attention(q=text_input,
-#                                                   k=text_input,
-#                                                   v=text_input,
-#                                                   context=visual_context)
-
-        
-#         # Global Information Fusion Mechanism
-#         weight_v = F.sigmoid(self.visual_gate(torch.cat((video_out, text_input), dim=-1)))
-
-#         output = self.final_layer_norm(text_input +
-#                                        weight_v * video_out)
-
-#         return output
-
-
 class MAF(nn.Module):
     
     def __init__(self,
@@ -690,11 +616,7 @@ class MAF(nn.Module):
         self.visual_gate = nn.Linear(2*dim_model, dim_model)
         self.dropout_layer = nn.Dropout(dropout_rate)
         self.final_layer_norm = nn.LayerNorm(dim_model)
-
-        
-        
-        
-        
+  
     def forward(self,
                 text_input: torch.Tensor,
                 visual_context: Optional[torch.Tensor]=None,
@@ -712,7 +634,7 @@ class MAF(nn.Module):
                                                   context=visual_context)
 
 
-         # kg as Context for Attention
+        # kg as Context for Attention
         # kg_context = kg_context.permute(0, 2, 1)
         # kg_context = self.kg_context_transform(kg_context)
         # kg_context = kg_context.permute(0, 2, 1)
@@ -780,7 +702,7 @@ class MAF_A(nn.Module):
         #                                           context=visual_context)
 
 
-         # kg as Context for Attention
+        # kg as Context for Attention
         audio_context = audio_context.permute(0, 2, 1)
         audio_context = self.audio_context_transform(audio_context)
         audio_context = audio_context.permute(0, 2, 1)
@@ -1034,34 +956,10 @@ class MultimodalBartEncoder(BartPretrainedModel):
         if head_mask is not None:
             assert head_mask.size()[0] == (len(self.layers)), f"The head_mask should be specified for {len(self.layers)} layers, but it is for {head_mask.size()[0]}."
         for idx, encoder_layer in enumerate(self.layers):
-           
-             # ================================ Modifications ================================ #
-            # if idx in self.fusion_at_layer:
-            #     visual_input = self.visual_transformer(visual_input)[-1]
-            #     hidden_states = self.MAF_layer(text_input=hidden_states,
-            #                                    visual_context=visual_input)
-
-            # =============================================================================== #
-
-            # if idx in self.fusionVis_at_layer:
-            #     visual_input = self.visual_transformer(visual_input)[-1]
-            #     # kg_input = self.kg_transformer(kg_input)[-1]
-            #     hidden_states = self.MAF_layer(text_input=hidden_states,
-            #                                    visual_context=visual_input)
-
-
             if idx in self.fusionAud_at_layer:
                 audio_input = self.audio_transformer(audio_input)[-1]
                 hidden_states = self.MAF_layer_A(text_input=hidden_states,
-                                               audio_context=audio_input)
-                                               #visual_context=visual_input)
-
-            # if idx in self.fusionPpc_at_layer:
-            #     ppc_input = self.ppc_transformer(ppc_input)[-1]
-            #     hidden_states = self.MAF_layer_P(text_input=hidden_states,
-            #                                    ppc_context=ppc_input)
-
-              
+                                               audio_context=audio_input) 
             if output_hidden_states:
                 encoder_states = encoder_states + (hidden_states,)
             # add LayerDrop (see https://arxiv.org/abs/1909.11556 for description)
@@ -1112,7 +1010,7 @@ def _save(model,
           state_dict=None):
         # If we are executing this function, we are the process zero, so we don't check for that.
         os.makedirs(output_dir, exist_ok=True)
-        #print(f"Saving model checkpoint to {output_dir}")
+        # print(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         if not isinstance(model, PreTrainedModel):
@@ -1426,116 +1324,51 @@ def jaccard(list1, list2):
     union = (len(list1) + len(list2)) - intersection
     return float(intersection) / union
 
-def get_scores(reference_list: list,
-               hypothesis_list: list):
-    count=0
-    met=0
-    bleu_1=0
-    bleu_2=0
-    bleu_3=0
-    bleu_4=0
-    rouge1=0
-    rouge2=0
-    bs = 0
-    J=0
-    rougel = 0
-    weights_1 = (1./1.,)
-    weights_2 = (1./2. , 1./2.)
-    weights_3 = (1./3., 1./3., 1./3.)
-    weights_4 = (1./4., 1./4., 1./4., 1./4.)
+
+def get_scores(reference_list: List[str], hypothesis_list: List[str]):
+    # Initialize accumulators
+    metrics = {
+        "rouge_1": 0,
+        "rouge_2": 0,
+        "rouge_L": 0,
+        "bleu_1": 0,
+        "bleu_2": 0,
+        "bleu_3": 0,
+        "bleu_4": 0,
+        "meteor": 0,
+    }
+    
+    # Define BLEU weights
+    bleu_weights = [
+        (1.,),             # BLEU-1
+        (0.5, 0.5),        # BLEU-2
+        (1/3, 1/3, 1/3),   # BLEU-3
+        (0.25, 0.25, 0.25, 0.25)  # BLEU-4
+    ]
+    
     rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
+    count = len(reference_list)
 
-    for reference, hypothesis in list(zip(reference_list, hypothesis_list)):
-        scores = rouge_scorer.score(reference, hypothesis)
-        rouge1 += scores['rouge1'].fmeasure
-        rouge2 += scores['rouge2'].fmeasure
-        rougel += scores['rougeL'].fmeasure
+    for reference, hypothesis in zip(reference_list, hypothesis_list):
+        # Compute ROUGE scores
+        rouge_scores = rouge_scorer.score(reference, hypothesis)
+        metrics["rouge_1"] += rouge_scores['rouge1'].fmeasure
+        metrics["rouge_2"] += rouge_scores['rouge2'].fmeasure
+        metrics["rouge_L"] += rouge_scores['rougeL'].fmeasure
 
-        met += meteor_score([word_tokenize(reference)], word_tokenize(hypothesis))
+        # Compute METEOR
+        metrics["meteor"] += meteor_score([reference], hypothesis)
 
-        Ref_E = Sem_model.encode(reference)
-        Hyp_E = Sem_model.encode(hypothesis)
+        # Tokenize for BLEU
+        tokenized_ref, tokenized_hyp = reference.split(), hypothesis.split()
 
-        bs += cosine_similarity([Ref_E],[Hyp_E])
+        # Compute BLEU scores
+        for i, weights in enumerate(bleu_weights, start=1):
+            metrics[f"bleu_{i}"] += sentence_bleu([tokenized_ref], tokenized_hyp, weights)
 
-        # print('ref:',reference)
-        # print('hyp:',hypothesis)
-        # print('co sine:',bs)
+    # Average the metrics
+    return {key: value * 100 / count for key, value in metrics.items()}
 
-
-        reference = reference.split()
-        hypothesis = hypothesis.split()
-        
-        # results = bertscore.compute(predictions=hypothesis, references=reference)
-
-        J += jaccard(reference, hypothesis)
-        # print('jaccard_score', J)
-
-
-        bleu_1 += sentence_bleu([reference], hypothesis, weights_1) 
-        bleu_2 += sentence_bleu([reference], hypothesis, weights_2)
-        bleu_3 += sentence_bleu([reference], hypothesis, weights_3)
-        bleu_4 += sentence_bleu([reference], hypothesis, weights_4)
-        count += 1
-
-    return {
-        "rouge_1": rouge1*100/count,
-        "rouge_2": rouge2*100/count,
-        "rouge_L": rougel*100/count,
-        "bleu_1": bleu_1*100/count,
-        "bleu_2": bleu_2*100/count,
-        "bleu_3": bleu_3*100/count,
-        "bleu_4": bleu_4*100/count,
-        "meteor": met*100/count,
-        "BS":bs/count,
-        "JS":J/count    }
-
-# def get_scores(reference_list: list,
-#                hypothesis_list: list):
-#     count=0
-#     met=0
-#     bleu_1=0
-#     bleu_2=0
-#     bleu_3=0
-#     bleu_4=0
-#     rouge1=0
-#     rouge2=0
-#     rougel = 0
-#     weights_1 = (1./1.,)
-#     weights_2 = (1./2. , 1./2.)
-#     weights_3 = (1./3., 1./3., 1./3.)
-#     weights_4 = (1./4., 1./4., 1./4., 1./4.)
-#     rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
-
-#     for reference, hypothesis in list(zip(reference_list, hypothesis_list)):
-#         scores = rouge_scorer.score(reference, hypothesis)
-#         rouge1 += scores['rouge1'].fmeasure
-#         rouge2 += scores['rouge2'].fmeasure
-#         rougel += scores['rougeL'].fmeasure
-
-#         # met += meteor_score([reference], hypothesis)
-#         met += meteor_score([word_tokenize(reference)], word_tokenize(hypothesis))
-
-#         reference = reference.split()
-#         hypothesis = hypothesis.split()
-#         bleu_1 += sentence_bleu([reference], hypothesis, weights_1) 
-#         bleu_2 += sentence_bleu([reference], hypothesis, weights_2)
-#         bleu_3 += sentence_bleu([reference], hypothesis, weights_3)
-#         bleu_4 += sentence_bleu([reference], hypothesis, weights_4)
-#         count += 1
-
-#     return {
-#         "rouge_1": rouge1*100/count,
-#         "rouge_2": rouge2*100/count,
-#         "rouge_L": rougel*100/count,
-#         "bleu_1": bleu_1*100/count,
-#         "bleu_2": bleu_2*100/count,
-#         "bleu_3": bleu_3*100/count,
-#         "bleu_4": bleu_4*100/count,
-#         "meteor": met*100/count,
-#     }
-
-       
 def prepare_for_training(model,
                          base_learning_rate: float,
                          new_learning_rate: float,
@@ -1619,16 +1452,6 @@ def train_epoch(model,
         audio_input = audio_input.unsqueeze(dim = 1)
         ppc_input = ppc_input.squeeze(dim = 1)
 
-
-        # print(acoustic_input.shape,ACOUSTIC_DIM)
-        # outputs , logits = model(input_ids=input_ids,
-        #                 attention_mask=attention_mask,
-        #                 visual_input=visual_input,
-        #                 intent_labels = intent_labels,
-        #                 labels=labels,
-        #                 test = False
-        #                 )
-
         outputs = model(input_ids=input_ids,
                         attention_mask=attention_mask,
                         visual_input=visual_input,
@@ -1641,27 +1464,11 @@ def train_epoch(model,
 
         loss = outputs['loss']
         encoder_last_hidden_state_clone = outputs['encoder_last_hidden_state'].detach().clone()
-        # encoder_last_hidden_state_clone = outputs['encoder_last_hidden_state']
         logits_intent = model2(encoder_last_hidden_state_clone)
         
         loss_function = CrossEntropyLoss()
         intent_loss = loss_function(logits_intent, intent_labels)
 
-
-
-        # intent_loss.backward()
-        # optimizer_intent.step()
-
-        # epoch_train_loss += loss.item()
-
-        # pred = list(torch.argmax(logits,dim  = -1).cpu().detach().numpy())
-        # act = list(intent_labels.cpu().detach().numpy())
-
-
-        # predictions.extend(pred)
-        # actuals.extend(act)
-           
-        #loss.backward()
         L = loss + 0.1*intent_loss
         # L = loss 
         L.backward()
@@ -1670,12 +1477,6 @@ def train_epoch(model,
         optimizer_intent.step()
 
         epoch_train_loss += loss.item()
-    # ACC = accuracy_score(actuals, predictions)
-    # print('Training accuracy:', ACC)
-    # accuracy = f1_score(actuals,predictions, average = "macro")
-   
-    # del pred
-    # del act
     del batch
     del input_ids
     del attention_mask
@@ -1686,9 +1487,6 @@ def train_epoch(model,
     del loss
     gc.collect()
     torch.cuda.empty_cache()
-   
-    #return epoch_train_loss/ step , predictions[0]
-    # return epoch_train_loss/ step , accuracy
     return epoch_train_loss/ step 
 
 
