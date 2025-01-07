@@ -848,52 +848,45 @@ def set_up_data_loader(dataset):
         shuffle=False
     )
 
-
-
-
-def get_scores(reference_list: list,
-               hypothesis_list: list):
-    count=0
-    met=0
-    bleu_1=0
-    bleu_2=0
-    bleu_3=0
-    bleu_4=0
-    rouge1=0
-    rouge2=0
-    rougel = 0
-    weights_1 = (1./1.,)
-    weights_2 = (1./2. , 1./2.)
-    weights_3 = (1./3., 1./3., 1./3.)
-    weights_4 = (1./4., 1./4., 1./4., 1./4.)
-    rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
-
-    for reference, hypothesis in list(zip(reference_list, hypothesis_list)):
-        scores = rouge_scorer.score(reference, hypothesis)
-        rouge1 += scores['rouge1'].fmeasure
-        rouge2 += scores['rouge2'].fmeasure
-        rougel += scores['rougeL'].fmeasure
-
-        met += meteor_score([reference], hypothesis)
-
-        reference = reference.split()
-        hypothesis = hypothesis.split()
-        bleu_1 += sentence_bleu([reference], hypothesis, weights_1) 
-        bleu_2 += sentence_bleu([reference], hypothesis, weights_2)
-        bleu_3 += sentence_bleu([reference], hypothesis, weights_3)
-        bleu_4 += sentence_bleu([reference], hypothesis, weights_4)
-        count += 1
-
-    return {
-        "rouge_1": rouge1*100/count,
-        "rouge_2": rouge2*100/count,
-        "rouge_L": rougel*100/count,
-        "bleu_1": bleu_1*100/count,
-        "bleu_2": bleu_2*100/count,
-        "bleu_3": bleu_3*100/count,
-        "bleu_4": bleu_4*100/count,
-        "meteor": met*100/count,
+def get_scores(reference_list: List[str], hypothesis_list: List[str]):
+    metrics = {
+        "rouge_1": 0,
+        "rouge_2": 0,
+        "rouge_L": 0,
+        "bleu_1": 0,
+        "bleu_2": 0,
+        "bleu_3": 0,
+        "bleu_4": 0,
+        "meteor": 0,
     }
+    
+    # Define BLEU weights
+    bleu_weights = [
+        (1.,),             # BLEU-1
+        (0.5, 0.5),        # BLEU-2
+        (1/3, 1/3, 1/3),   # BLEU-3
+        (0.25, 0.25, 0.25, 0.25)  # BLEU-4
+    ]
+    
+    rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL'])
+    count = len(reference_list)
+
+    for reference, hypothesis in zip(reference_list, hypothesis_list):
+        rouge_scores = rouge_scorer.score(reference, hypothesis)
+        metrics["rouge_1"] += rouge_scores['rouge1'].fmeasure
+        metrics["rouge_2"] += rouge_scores['rouge2'].fmeasure
+        metrics["rouge_L"] += rouge_scores['rougeL'].fmeasure
+
+        metrics["meteor"] += meteor_score([reference], hypothesis)
+
+        # Tokenize for BLEU
+        tokenized_ref, tokenized_hyp = reference.split(), hypothesis.split()
+
+        for i, weights in enumerate(bleu_weights, start=1):
+            metrics[f"bleu_{i}"] += sentence_bleu([tokenized_ref], tokenized_hyp, weights)
+
+    # Average the metrics
+    return {key: value * 100 / count for key, value in metrics.items()}
 
 
 
@@ -1161,18 +1154,6 @@ def train(model,
                                  optimizer)
         train_losses.append(train_loss)
         
-        # val_loss = val_epoch(model,
-        #                      val_data_loader, 
-        #                      optimizer)
-        # val_losses.append(val_loss)
-
-        # val_results = get_val_scores(model,
-        #                              tokenizer,
-        #                              val_data_loader,
-        #                              desc="Validation Generation Iteration",
-        #                              epoch=epoch,
-        #                              **gen_kwargs)
-        # val_rouge_2.append(val_results['rouge_2'])
         
         test_results = get_val_scores(model,
                                       tokenizer,
@@ -1182,9 +1163,6 @@ def train(model,
                                       **gen_kwargs)
         val_loss =0
         print("Epoch: {}\ttrain_loss: {}".format(epoch+1, train_loss))
-        
-        # print("\nval_rouge_1: {}\tval_rouge_2: {}\tval_rouge_L: {}\tval_bleu_1: {}\tval_bleu_2: {}\tval_bleu_3: {}\tval_bleu_4: {}\tval_meteor: {}".format(
-        # val_results['rouge_1'], val_results['rouge_2'], val_results['rouge_L'], val_results['bleu_1'], val_results['bleu_2'], val_results['bleu_3'], val_results['bleu_4'], val_results['meteor']))
         
         print("\ntest_rouge_1: {}\ttest_rouge_2: {}\ttest_rouge_L: {}\ttest_bleu_1: {}\ttest_bleu_2: {}\ttest_bleu_3: {}\ttest_bleu_4: {}\ttest_meteor: {}".format(
         test_results['rouge_1'], test_results['rouge_2'], test_results['rouge_L'], test_results['bleu_1'], test_results['bleu_2'], test_results['bleu_3'], test_results['bleu_4'], test_results['meteor']))
@@ -1196,13 +1174,6 @@ def train(model,
                    tokenizer)
         print("Model saved at path: ", path)
         
-        # if val_results['rouge_2'] < max(val_rouge_2):
-        #     patience = patience + 1          
-        #     if patience == EARLY_STOPPING_THRESHOLD:
-        #         break
-                
-        # else:
-        #     patience = 1
 
         del train_loss
         del val_loss
