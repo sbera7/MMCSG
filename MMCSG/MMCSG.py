@@ -36,7 +36,6 @@ import random
 from sentence_transformers import SentenceTransformer
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import warnings
 
